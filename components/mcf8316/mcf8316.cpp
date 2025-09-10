@@ -344,7 +344,7 @@ MCF8316Component::ErrorCode MCF8316Component::save_config_to_eeprom() {
 
   RegisterValue<Register::ALGO_CTRL1> algo_ctrl1;
   algo_ctrl1.set(EEPROM_WRT, true);
-  algo_ctrl1.set(EEPROM_WRITE_ACCESS_KEY, uint8_t(0xa5));
+  algo_ctrl1.set(EEPROM_WRITE_ACCESS_KEY, 0xa5u);
   ErrorCode error = this->write(algo_ctrl1);
   if (error) {
     ESP_LOGE(TAG, "Failed to save the configuration shadow registers to the EEPROM: %s", error_name(error));
@@ -369,7 +369,7 @@ MCF8316Component::ErrorCode MCF8316Component::start_mpet(bool write_shadow) {
 
   ESP_LOGI(TAG, "Starting motor parameter extraction tool");
   RegisterValue<Register::ALGO_DEBUG2> algo_debug2;
-  algo_debug2.set(MPET_CMD, uint8_t(1u));
+  algo_debug2.set(MPET_CMD, 1u);
   algo_debug2.set(MPET_R, true);
   algo_debug2.set(MPET_L, true);
   algo_debug2.set(MPET_KE, true);
@@ -442,7 +442,7 @@ void MCF8316Component::check_mpet_algorithm_state_(AlgorithmState algorithm_stat
 
   // Clear MPET flags so the tool doesn't run again right away if a fault is cleared
   RegisterValue<Register::ALGO_DEBUG2> algo_debug2;
-  algo_debug2.set(MPET_CMD, uint8_t(0u));
+  algo_debug2.set(MPET_CMD, 0u);
   algo_debug2.set(MPET_R, false);
   algo_debug2.set(MPET_L, false);
   algo_debug2.set(MPET_KE, false);
@@ -468,17 +468,17 @@ MCF8316Component::ErrorCode MCF8316Component::write_speed_input(float speed_in_r
   const float max_speed = this->config_shadow_.get(MAX_SPEED);
   const float speed_in_electrical_hz = this->convert_speed_in_rotor_hz_to_electrical_hz(speed_in_rotor_hz);
   RegisterValue<Register::ALGO_DEBUG1> algo_debug1;
-  algo_debug1.set(DIGITAL_SPEED_CTRL, uint16_t(std::clamp(speed_in_electrical_hz * (32768.f * 6) / max_speed, 0.f, 32767.f)));
+  algo_debug1.set(DIGITAL_SPEED_CTRL, unsigned(std::clamp(speed_in_electrical_hz * (32768.f * 6) / max_speed, 0.f, 32767.f)));
   return this->write(algo_debug1);
 }
 
 float MCF8316Component::convert_speed_in_electrical_hz_to_rotor_hz(float speed_in_electrical_hz) const {
-  const uint8_t fg_div = this->config_shadow_.get(FG_DIV);
+  const unsigned fg_div = this->config_shadow_.get(FG_DIV);
   return mcf8316::convert_speed_in_electrical_hz_to_rotor_hz(speed_in_electrical_hz, fg_div);
 }
 
 float MCF8316Component::convert_speed_in_rotor_hz_to_electrical_hz(float speed_in_rotor_hz) const {
-  const uint8_t fg_div = this->config_shadow_.get(FG_DIV);
+  const unsigned fg_div = this->config_shadow_.get(FG_DIV);
   return mcf8316::convert_speed_in_rotor_hz_to_electrical_hz(speed_in_rotor_hz, fg_div);
 }
 
