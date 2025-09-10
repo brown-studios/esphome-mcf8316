@@ -564,26 +564,13 @@ MCF8316Component::ErrorCode MCF8316Component::modify_config_register_with_workar
 MCF8316Component::ErrorCode MCF8316Component::read_register_(Register reg, uint32_t* out_value, bool silence_logs) {
   RETURN_ERROR_IF_FAILED_OR_ASLEEP;
 
-  uint32_t ctrl = CTRL_OP_READ | CTRL_CRC_EN | CTRL_DLEN_32 | uint32_t(reg);
-  uint8_t header[] = { uint8_t(ctrl >> 16), uint8_t(ctrl >> 8), uint8_t(ctrl) };
-  // FIXME: Preferably this transaction would not assert a STOP condition on the I2C bus
-  // between the write and the read.  It used to work in ESP-IDF 5.3.2 but broke in
-  // ESP-IDF 5.4.2 which expects all transactions to end with a STOP.
-  // See https://github.com/esphome/esphome/issues/10346
-  esphome::i2c::ErrorCode i2c_error = this->bus_->write(this->address_, header, sizeof(header), true /*stop*/);
-  if (i2c_error) {
-    if (!silence_logs) {
-      ESP_LOGE(TAG, "Failed to read register 0x%x: ERROR_I2C code %d", reg, i2c_error);
-    }
-    return ErrorCode::ERROR_I2C;
-  }
-  uint32_t data;
-  uint8_t crc_actual;
-  esphome::i2c::ReadBuffer read_buffers[] = {
-    { reinterpret_cast<uint8_t*>(&data), sizeof(data) },
-    { &crc_actual, 1 },
+  const uint32_t ctrl = CTRL_OP_READ | CTRL_CRC_EN | CTRL_DLEN_32 | uint32_t(reg);
+  uint8_t write_buffer[] = {
+    uint8_t(ctrl >> 16), uint8_t(ctrl >> 8), uint8_t(ctrl),
   };
-  i2c_error = this->bus_->readv(this->address_, read_buffers, 2);
+  uint8_t read_buffer[5];
+  esphome::i2c::ErrorCode i2c_error = this->bus_->write_readv(this->address_,
+      write_buffer, sizeof(write_buffer), read_buffer, sizeof(read_buffer));
   if (i2c_error) {
     if (!silence_logs) {
       ESP_LOGE(TAG, "Failed to read register 0x%x: ERROR_I2C code %d", reg, i2c_error);
@@ -592,16 +579,18 @@ MCF8316Component::ErrorCode MCF8316Component::read_register_(Register reg, uint3
   }
   CRC8 crc_expected;
   crc_expected.append(this->address_ << 1);
-  crc_expected.append(header, sizeof(header));
+  crc_expected.append(write_buffer, sizeof(write_buffer));
   crc_expected.append((this->address_ << 1) | 0x01);
-  crc_expected.append(reinterpret_cast<uint8_t*>(&data), sizeof(data));
+  crc_expected.append(read_buffer, sizeof(read_buffer) - 1);
+  const uint8_t crc_actual = read_buffer[sizeof(read_buffer) - 1];
   if (crc_expected.value != crc_actual) {
     if (!silence_logs) {
       ESP_LOGE(TAG, "Failed to read register 0x%x: ERROR_CRC", reg);
     }
     return ErrorCode::ERROR_CRC;
   }
-  *out_value = convert_little_endian(data);
+
+  *out_value = read_buffer[0] | (read_buffer[1] << 8) | (read_buffer[2] << 16) | (read_buffer[3] << 24);
   if (!silence_logs) {
     ESP_LOGVV(TAG, "Read register: 0x%x, value: 0x%08x", reg, *out_value);
   }
@@ -614,19 +603,20 @@ MCF8316Component::ErrorCode MCF8316Component::write_register_(Register reg, cons
   if (!silence_logs) {
     ESP_LOGVV(TAG, "Write register: 0x%x, value: 0x%08x", reg, value);
   }
-  uint32_t ctrl = CTRL_CRC_EN | CTRL_DLEN_32 | uint32_t(reg);
-  uint8_t header[] = { uint8_t(ctrl >> 16), uint8_t(ctrl >> 8), uint8_t(ctrl) };
-  uint32_t data = convert_little_endian(value);
+
+  const uint32_t ctrl = CTRL_CRC_EN | CTRL_DLEN_32 | uint32_t(reg);
+  uint8_t write_buffer[] = {
+    uint8_t(ctrl >> 16), uint8_t(ctrl >> 8), uint8_t(ctrl),
+    uint8_t(value), uint8_t(value >> 8), uint8_t(value >> 16), uint8_t(value >> 24),
+    0 /*crc*/,
+  };
   CRC8 crc;
   crc.append(this->address_ << 1);
-  crc.append(header, sizeof(header));
-  crc.append(reinterpret_cast<uint8_t*>(&data), sizeof(data));
-  esphome::i2c::WriteBuffer write_buffers[] = {
-    { header, sizeof(header) },
-    { reinterpret_cast<uint8_t*>(&data), sizeof(data) },
-    { &crc.value, 1 },
-  };
-  esphome::i2c::ErrorCode i2c_error = this->bus_->writev(this->address_, write_buffers, 3, true /*stop*/);
+  crc.append(write_buffer, sizeof(write_buffer) - 1);
+  write_buffer[sizeof(write_buffer) - 1] = crc.value;
+
+  esphome::i2c::ErrorCode i2c_error = this->bus_->write_readv(this->address_,
+      write_buffer, sizeof(write_buffer), nullptr, 0);
   if (i2c_error) {
     if (!silence_logs) {
       ESP_LOGE(TAG, "Failed to write register 0x%x: ERROR_I2C code %d", reg, i2c_error);
