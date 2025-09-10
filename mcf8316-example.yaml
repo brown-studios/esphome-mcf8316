@@ -4,6 +4,7 @@
 esphome:
   name: mcf8316-example
   friendly_name: MCF8316 Example
+  min_version: "2025.8.4"
 
 esp32:
   board: lolin_s2_mini  # Change this for the board you are using
@@ -43,24 +44,13 @@ i2c:
   - scl: 9
     sda: 8
     scan: false # The MCF8316 will not be detected in a scan although it is harmless
-    #frequency: 100kHz
+    frequency: 100kHz
 
 # Configure the BLDC motor driver.
 mcf8316:
   - id: motor_driver
     wake: 2
     nfault: 3
-
-output:
-  - id: speed
-    platform: ledc
-    pin:
-      number: 4
-      mode: output
-      inverted: false
-    #channel: 5
-    #frequency: ${minuet_fan_motor_pwm_frequency_default} Hz
-    frequency: 20000 Hz
 
 # Controls
 button:
@@ -78,12 +68,15 @@ button:
         - lambda: |-
             auto driver = id(motor_driver);
             auto config = driver->make_default_config();
-            //config.set(esphome::mcf8316::IPD_CURR_THR, esphome::mcf8316::IPDCurrThr::CURR_0_5_A);
-            //config.set(esphome::mcf8316::SPEED_MODE, esphome::mcf8316::SpeedMode::REGISTER);
-            //config.set(esphome::mcf8316::BRAKE_INPUT, esphome::mcf8316::BrakeInput::OFF);
-            //config.set(esphome::mcf8316::BUS_VOLT, esphome::mcf8316::BusVolt::MAXIMUM_30_V);
-            config.set(esphome::mcf8316::FG_DIV, uint8_t(2));
-            config.set(esphome::mcf8316::MAX_SPEED, uint16_t(4000));
+
+            // NOTE: Creating a motor configuration from scratch requires setting many
+            // parameters as described in the MCF8316 datasheet.  This example just shows the
+            // syntax and isn't enough to get the motor running.  For a real implementation,
+            // see https://github.com/brown-studios/minuet-firmware/blob/main/minuet/fan_driver.h
+
+            config.set(esphome::mcf8316::FG_DIV, esphome::mcf8316::fg_div_from_motor_poles(4));
+            // config.set...
+
             driver->write_config(config);
   - platform: template
     name: "Start MPET"
@@ -98,14 +91,14 @@ button:
       then:
         - lambda: |-
             auto driver = id(motor_driver);
-            driver->write_target_motor_speed_in_rotor_hz(10);
+            driver->write_speed_input(10);
   - platform: template
     name: "Stop motor"
     on_press:
       then:
         - lambda: |-
             auto driver = id(motor_driver);
-            driver->write_target_motor_speed_in_rotor_hz(0);
+            driver->write_speed_input(0);
   - platform: template
     name: "Clear fault"
     on_press:
