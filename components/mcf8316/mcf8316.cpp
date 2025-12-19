@@ -118,7 +118,7 @@ void MCF8316Component::setup() {
     error = this->load_config_from_eeprom();
   }
   if (error) {
-    this->mark_failed("Failed to load config during setup");
+    this->mark_failed(LOG_STR("Failed to load config during setup"));
   }
 }
 
@@ -141,7 +141,7 @@ void MCF8316Component::wake_() {
 
     ErrorCode error = this->read_config();
     if (error) {
-      this->mark_failed("Failed to load config during wake-up");
+      this->mark_failed(LOG_STR("Failed to load config during wake-up"));
     }
   }
 }
@@ -180,7 +180,7 @@ void MCF8316Component::tickle_watchdog_() {
     constexpr uint8_t FAIL_LIMIT = 4;
     if (this->tickle_failure_count_++ >= FAIL_LIMIT) {
       this->tickle_failure_count_ = 1;
-      this->mark_failed("Device not responding");
+      this->mark_failed(LOG_STR("Device not responding"));
     }
   } else {
     if (this->tickle_failure_count_) {
@@ -255,7 +255,7 @@ void MCF8316Component::check_algorithm_state_() {
     constexpr uint8_t FAIL_LIMIT = 4;
     if (this->algorithm_state_failure_count_++ >= FAIL_LIMIT) {
       this->algorithm_state_failure_count_ = 1;
-      this->mark_failed("Device not responding");
+      this->mark_failed(LOG_STR("Device not responding"));
     }
     return; // skip it
   } else {
