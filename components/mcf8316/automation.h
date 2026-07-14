@@ -13,5 +13,12 @@ class FaultTrigger : public Trigger<MCF8316Component::FaultStatus> {
   }
 };
 
+class AlgorithmStateTrigger : public Trigger<AlgorithmState> {
+ public:
+  explicit AlgorithmStateTrigger(MCF8316Component *parent) {
+    parent->add_on_algorithm_state_callback([this](AlgorithmState value) { this->trigger(value); });
+  }
+};
+
 }  // namespace mcf8316
 }  // namespace esphome

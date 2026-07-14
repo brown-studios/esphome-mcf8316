@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 
 namespace esphome {
 namespace mcf8316 {
@@ -43,7 +44,12 @@ class MCF8316Component : public Component {
 
   void set_wake_pin(GPIOPin* pin) { this->wake_pin_ = pin; }
   void set_nfault_pin(GPIOPin* pin) { this->nfault_pin_ = pin; }
-  void set_watchdog(bool enable) { this->watchdog_ = enable; }
+  void set_watchdog_pin(GPIOPin* pin) { this->watchdog_pin_ = pin; }
+  void set_watchdog_over_i2c(bool enable) { this->watchdog_over_i2c_ = enable; }
+
+  void add_on_algorithm_state_callback(std::function<void(AlgorithmState)> &&callback) {
+    this->on_algorithm_state_callback_.add(std::move(callback));
+  }
 
   void add_on_fault_callback(std::function<void(FaultStatus)> &&callback) {
     this->on_fault_callback_.add(std::move(callback));
@@ -54,10 +60,17 @@ class MCF8316Component : public Component {
   void loop() override;
   void dump_config() override;
 
+  // Gets the value of the algorithm state register most recently read in the loop.
+  // Returns an empty value if the driver is asleep or the register could not be read.
+  std::optional<AlgorithmState> algorithm_state() const { return this->algorithm_state_; }
+
+  // Gets the value of the fault status register most recently read in the loop.
+  // Returns an empty value if the driver is asleep or the register could not be read.
   FaultStatus fault_status() const { return this->fault_status_; }
   bool is_faulted() const { return !this->fault_status_.is_faulted(); }
   void clear_fault();
 
+  // Returns true if the driver is awake (not sleeping).
   bool is_awake() const { return this->awake_; }
 
   // Wakes the device from sleep.
@@ -199,16 +212,20 @@ class MCF8316Component : public Component {
 
   GPIOPin* wake_pin_{nullptr};
   GPIOPin* nfault_pin_{nullptr};
-  bool watchdog_{};
+  GPIOPin* watchdog_pin_{nullptr};
+  bool watchdog_over_i2c_{};
 
   bool awake_{false};
   bool mpet_in_progress_{false};
   bool mpet_may_write_shadow_{false};
   uint32_t mpet_start_time_{};
-  AlgorithmState last_algorithm_state_{};
-  uint8_t algorithm_state_failure_count_{};
+
   uint8_t tickle_failure_count_{};
   uint32_t last_tickle_time_{};
+
+  std::optional<AlgorithmState> algorithm_state_{};
+  uint8_t algorithm_state_failure_count_{};
+  CallbackManager<void(AlgorithmState)> on_algorithm_state_callback_;
 
   FaultStatus fault_status_{};
   CallbackManager<void(FaultStatus)> on_fault_callback_;

@@ -62,9 +62,10 @@ float MCF8316Component::get_setup_priority() const { return setup_priority::HARD
 void MCF8316Component::dump_config() {
   ESP_LOGCONFIG(TAG, "MCF8316 component:");
   ESP_LOGCONFIG(TAG, "  Address: 0x%02X", this->address_);
-  ESP_LOGCONFIG(TAG, "  WAKE Pin: %s", this->wake_pin_->dump_summary().c_str());
-  ESP_LOGCONFIG(TAG, "  NFAULT Pin: %s", this->nfault_pin_->dump_summary().c_str());
-  ESP_LOGCONFIG(TAG, "  Watchdog enabled: %d", this->watchdog_);
+  LOG_PIN("  WAKE Pin: ", this->wake_pin_);
+  LOG_PIN("  NFAULT Pin: ", this->nfault_pin_);
+  LOG_PIN("  Watchdog Pin: ", this->watchdog_pin_);
+  ESP_LOGCONFIG(TAG, "  Watchdog Source: %s", this->watchdog_over_i2c_ ? "I2C" : this->watchdog_pin_ ? "Pin" : "None");
 
   log_config(this->config_shadow_);
 }
@@ -78,9 +79,14 @@ Config MCF8316Component::make_default_config() const {
   config.set(DIR_INPUT, DirInput::OVERRIDE_CLOCKWISE); // set direction over I2C
   config.set(DEV_MODE, DeviceMode::SLEEP); // enable sleep when wake pin is low
   config.set(SLEEP_ENTRY_TIME, SleepEntryTime::SLEEP_AFTER_20_MS); // sleep when speed pin low for this amount of time
-  if (this->watchdog_) {
+  if (this->watchdog_pin_) {
     config.set(EXT_WDT_EN, true); // enable watchdog timer
-    config.set(EXT_WDT_CONFIG, WatchdogTimeout::TIMEOUT_I2C_2_S_GPIO_200_MS); // 2 second timeout over I2C
+    config.set(EXT_WDT_CONFIG, WatchdogTimeout::TIMEOUT_I2C_10_S_GPIO_1000_MS); // 1 second timeout over GPIO
+    config.set(EXT_WDT_INPUT_MODE, WatchdogInputMode::GPIO); // watchdog tickle over GPIO
+    config.set(EXT_WDT_FAULT_MODE, WatchdogFaultMode::LATCH_HI_Z); // latch in Hi-Z when watchdog fault occurs
+  } else if (this->watchdog_over_i2c_) {
+    config.set(EXT_WDT_EN, true); // enable watchdog timer
+    config.set(EXT_WDT_CONFIG, WatchdogTimeout::TIMEOUT_I2C_1_S_GPIO_100_MS); // 1 second timeout over I2C
     config.set(EXT_WDT_INPUT_MODE, WatchdogInputMode::I2C); // watchdog tickle over I2C
     config.set(EXT_WDT_FAULT_MODE, WatchdogFaultMode::LATCH_HI_Z); // latch in Hi-Z when watchdog fault occurs
   } else {
@@ -92,6 +98,9 @@ Config MCF8316Component::make_default_config() const {
 void MCF8316Component::setup() {
   this->wake_pin_->setup();
   this->nfault_pin_->setup();
+  if (this->watchdog_pin_) {
+    this->watchdog_pin_->setup();
+  }
 
   // We don't know whether the device has been programmed to use the SPEED/WAKE pin
   // exclusively for wake-ups.  Until we know for sure, we don't want to set the pin
@@ -124,7 +133,7 @@ void MCF8316Component::setup() {
 
 void MCF8316Component::loop() {
   if (this->awake_) {
-    if (this->watchdog_) {
+    if (this->watchdog_pin_ || this->watchdog_over_i2c_) {
       this->tickle_watchdog_();
     }
     this->check_fault_();
@@ -151,6 +160,8 @@ void MCF8316Component::sleep_() {
     ESP_LOGI(TAG, "Going to sleep");
     this->awake_ = false;
     this->update_wake_state_for_pin_config_();
+    this->fault_status_ = {};
+    this->algorithm_state_ = {};
   }
 }
 
@@ -163,29 +174,36 @@ void MCF8316Component::update_wake_state_for_pin_config_() {
 }
 
 void MCF8316Component::tickle_watchdog_() {
-  constexpr uint32_t TICKLE_INTERVAL = 250; // timeout is 2000 ms
+  constexpr uint32_t TICKLE_INTERVAL = 250; // must be less than the configured watchdog timeout (1000 ms)
   uint32_t now = millis();
   if (now - this->last_tickle_time_ < TICKLE_INTERVAL) {
     return;
   }
 
-  RegisterValue<Register::ALGO_CTRL1> algo_ctrl1;
-  algo_ctrl1.set(WATCHDOG_TICKLE, true);
-  ErrorCode error = this->write(algo_ctrl1);
-  if (error) {
-    if (!this->tickle_failure_count_) {
-      ESP_LOGW(TAG, "Failed to tickle watchdog timer: %s", error_name(error));
-      this->update_warning_();
-    }
-    constexpr uint8_t FAIL_LIMIT = 4;
-    if (this->tickle_failure_count_++ >= FAIL_LIMIT) {
-      this->tickle_failure_count_ = 1;
-      this->mark_failed(LOG_STR("Device not responding"));
-    }
-  } else {
-    if (this->tickle_failure_count_) {
-      this->tickle_failure_count_ = 0;
-      this->update_warning_();
+  if (this->watchdog_pin_) {
+    this->watchdog_pin_->digital_write(true);
+    esphome::delay_microseconds_safe(100);
+    this->watchdog_pin_->digital_write(false);
+  } else if (this->watchdog_over_i2c_) {
+    RegisterValue<Register::ALGO_CTRL1> algo_ctrl1;
+    algo_ctrl1.set(WATCHDOG_TICKLE, true);
+    ErrorCode error = this->write(algo_ctrl1);
+    if (error) {
+      if (!this->tickle_failure_count_) {
+        ESP_LOGW(TAG, "Failed to tickle watchdog timer: %s", error_name(error));
+        this->update_warning_();
+      }
+      constexpr uint8_t FAIL_LIMIT = 4;
+      if (this->tickle_failure_count_ >= FAIL_LIMIT) {
+        this->mark_failed(LOG_STR("Device not responding"));
+      } else {
+        this->tickle_failure_count_++;
+      }
+    } else {
+      if (this->tickle_failure_count_) {
+        this->tickle_failure_count_ = 0;
+        this->update_warning_();
+      }
     }
   }
   this->last_tickle_time_ = now;
@@ -253,24 +271,31 @@ void MCF8316Component::check_algorithm_state_() {
       this->update_warning_();
     }
     constexpr uint8_t FAIL_LIMIT = 4;
-    if (this->algorithm_state_failure_count_++ >= FAIL_LIMIT) {
-      this->algorithm_state_failure_count_ = 1;
+    if (this->algorithm_state_failure_count_ >= FAIL_LIMIT) {
+      this->algorithm_state_ = {};
       this->mark_failed(LOG_STR("Device not responding"));
+    } else {
+      this->algorithm_state_failure_count_ = 1;
     }
     return; // skip it
-  } else {
-    if (this->algorithm_state_failure_count_) {
-      this->algorithm_state_failure_count_ = 0;
-      this->update_warning_();
-    }
+  }
+
+  if (this->algorithm_state_failure_count_) {
+    this->algorithm_state_failure_count_ = 0;
+    this->update_warning_();
   }
 
   AlgorithmState algorithm_state = algorithm_state_value.get(ALGORITHM_STATE);
-  if (algorithm_state != last_algorithm_state_) {
-    last_algorithm_state_ = algorithm_state;
+  bool trigger = false;
+  if (this->algorithm_state_ != algorithm_state) {
+    this->algorithm_state_ = algorithm_state;
     ESP_LOGD(TAG, "Algorithm state: %s", algorithm_state_name(algorithm_state));
+    trigger = true;
   }
   this->check_mpet_algorithm_state_(algorithm_state);
+  if (trigger) {
+    this->on_algorithm_state_callback_.call(algorithm_state);
+  }
 }
 
 MCF8316Component::ErrorCode MCF8316Component::read_config() {
