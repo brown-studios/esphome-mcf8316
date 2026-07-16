@@ -20,32 +20,48 @@ class MCF8316Component : public Component {
  public:
   enum ErrorCode {
     NO_ERROR = 0,
-    ERROR_I2C = 1, // I2C transaction failed
-    ERROR_CRC = 2, // CRC checksum mismatch
-    ERROR_DEVICE = 3, // Device reported an error during the operation
-    ERROR_ASLEEP = 4, // Decide is asleep
-    ERROR_FAILED = 5, // Component is in failed state and cannot be used
+    ERROR_I2C = 1,     // I2C transaction failed
+    ERROR_CRC = 2,     // CRC checksum mismatch
+    ERROR_DEVICE = 3,  // Device reported an error during the operation
+    ERROR_ASLEEP = 4,  // Decide is asleep
+    ERROR_FAILED = 5,  // Component is in failed state and cannot be used
   };
-  static const char* error_name(ErrorCode code);
+  static const char *error_name(ErrorCode code);
 
   struct FaultStatus final {
     GateDriverFaultStatus gate_driver;
     ControllerFaultStatus controller;
 
-    bool is_faulted() const { return gate_driver != 0 || controller != 0; }
-    bool is_cleared() const { return !is_faulted(); }
+    bool is_faulted() const {
+      return gate_driver != 0 || controller != 0;
+    }
+    bool is_cleared() const {
+      return !is_faulted();
+    }
 
-    bool operator==(const FaultStatus&) const = default;
-    bool operator!=(const FaultStatus&) const = default;
+    bool operator==(const FaultStatus &) const = default;
+    bool operator!=(const FaultStatus &) const = default;
   };
 
-  void set_i2c_address(uint8_t address) { this->address_ = address; }
-  void set_i2c_bus(esphome::i2c::I2CBus *bus) { this->bus_ = bus; }
+  void set_i2c_address(uint8_t address) {
+    this->address_ = address;
+  }
+  void set_i2c_bus(esphome::i2c::I2CBus *bus) {
+    this->bus_ = bus;
+  }
 
-  void set_wake_pin(GPIOPin* pin) { this->wake_pin_ = pin; }
-  void set_nfault_pin(GPIOPin* pin) { this->nfault_pin_ = pin; }
-  void set_watchdog_pin(GPIOPin* pin) { this->watchdog_pin_ = pin; }
-  void set_watchdog_over_i2c(bool enable) { this->watchdog_over_i2c_ = enable; }
+  void set_wake_pin(GPIOPin *pin) {
+    this->wake_pin_ = pin;
+  }
+  void set_nfault_pin(GPIOPin *pin) {
+    this->nfault_pin_ = pin;
+  }
+  void set_watchdog_pin(GPIOPin *pin) {
+    this->watchdog_pin_ = pin;
+  }
+  void set_watchdog_over_i2c(bool enable) {
+    this->watchdog_over_i2c_ = enable;
+  }
 
   void add_on_algorithm_state_callback(std::function<void(AlgorithmState)> &&callback) {
     this->on_algorithm_state_callback_.add(std::move(callback));
@@ -62,25 +78,37 @@ class MCF8316Component : public Component {
 
   // Gets the value of the algorithm state register most recently read in the loop.
   // Returns an empty value if the driver is asleep or the register could not be read.
-  std::optional<AlgorithmState> algorithm_state() const { return this->algorithm_state_; }
+  std::optional<AlgorithmState> algorithm_state() const {
+    return this->algorithm_state_;
+  }
 
   // Gets the value of the fault status register most recently read in the loop.
   // Returns an empty value if the driver is asleep or the register could not be read.
-  FaultStatus fault_status() const { return this->fault_status_; }
-  bool is_faulted() const { return !this->fault_status_.is_faulted(); }
+  FaultStatus fault_status() const {
+    return this->fault_status_;
+  }
+  bool is_faulted() const {
+    return !this->fault_status_.is_faulted();
+  }
   void clear_fault();
 
   // Returns true if the driver is awake (not sleeping).
-  bool is_awake() const { return this->awake_; }
+  bool is_awake() const {
+    return this->awake_;
+  }
 
   // Wakes the device from sleep.
   // Reloads `config_shadow` because the device reloads the configuration from EEPROM
   // when it wakes up from sleep.
-  void wake() { this->wake_(); }
+  void wake() {
+    this->wake_();
+  }
 
   // Asks the device to go to sleep after the configured `SLEEP_ENTRY_TIME` has expired.
   // Going to sleep has the side-effect of stopping the motor.
-  void sleep() { this->sleep_(); }
+  void sleep() {
+    this->sleep_();
+  }
 
   // Returns a mostly zero-filled configuration with bits set for control over I2C.
   //
@@ -99,11 +127,15 @@ class MCF8316Component : public Component {
 
   // Returns a cached copy of the configuration that was last loaded from or saved to EEPROM.
   // Represents the non-volatile configuration of the device.
-  const Config& config_eeprom() const { return this->config_eeprom_; }
+  const Config &config_eeprom() const {
+    return this->config_eeprom_;
+  }
 
   // Returns a cached copy of the configuration that was last read from or written to the shadow registers.
   // Represents the volatile configuration of the device.
-  const Config& config_shadow() const { return this->config_shadow_; }
+  const Config &config_shadow() const {
+    return this->config_shadow_;
+  }
 
   // Reads the configuration from the shadow registers.
   // Updates the contents of `config_shadow`.
@@ -137,7 +169,7 @@ class MCF8316Component : public Component {
   // The returned value is signed:
   // - Positive sign indicates movement in the clockwise direction.
   // - Negative sign indicates movement in the counter-clockwise direction.
-  ErrorCode read_speed_feedback(float* out_speed_in_rotor_hz);
+  ErrorCode read_speed_feedback(float *out_speed_in_rotor_hz);
 
   // Writes the target motor speed in rotor Hz.
   // Applies `FG_DIV` to convert the speed input from rotor Hz.
@@ -156,31 +188,28 @@ class MCF8316Component : public Component {
   float convert_speed_in_rotor_hz_to_electrical_hz(float speed_in_rotor_hz) const;
 
   // Reads the BUS_CURRENT register and scales the result to amps.
-  ErrorCode read_bus_current(float* out_current_in_amps);
+  ErrorCode read_bus_current(float *out_current_in_amps);
 
   // Reads the IMAG_SQR register and scales the result to amps.
-  ErrorCode read_motor_phase_peak_current(float* out_current_in_amps);
+  ErrorCode read_motor_phase_peak_current(float *out_current_in_amps);
 
   // Reads the VM_VOLTAGE register and scales the result to volts.
-  ErrorCode read_vm_voltage(float* out_voltage_in_volts);
+  ErrorCode read_vm_voltage(float *out_voltage_in_volts);
 
   // Reads a non-configuration register from the device.
-  template <Register reg>
-  ErrorCode read(RegisterValue<reg>* out_register_value) {
+  template<Register reg> ErrorCode read(RegisterValue<reg> *out_register_value) {
     static_assert(!is_config_register(reg), "Use config_shadow() to access configuration registers.");
     return this->read_register_(reg, &out_register_value->value);
   }
 
   // Writes a register to the device.
-  template <Register reg>
-  ErrorCode write(RegisterValue<reg> register_value) {
+  template<Register reg> ErrorCode write(RegisterValue<reg> register_value) {
     static_assert(!is_config_register(reg), "Use config_shadow() to access configuration registers.");
     return this->write_register_(reg, register_value.value);
   }
 
   // Modifies and writes a single config register and updates `config_shadow`.
-  template <Register reg, typename Mutator>
-  ErrorCode modify_config_register(Mutator mutator) {
+  template<Register reg, typename Mutator> ErrorCode modify_config_register(Mutator mutator) {
     return this->modify_config_register_with_workarounds_(reg, mutator(this->config_shadow_.at<reg>()));
   }
 
@@ -201,18 +230,18 @@ class MCF8316Component : public Component {
 
   ErrorCode modify_config_register_with_workarounds_(Register reg, RegisterValue_ register_value);
 
-  ErrorCode read_register_(Register reg, uint32_t* out_value, bool silence_logs = false);
+  ErrorCode read_register_(Register reg, uint32_t *out_value, bool silence_logs = false);
   ErrorCode write_register_(Register reg, uint32_t value, bool silence_logs = false);
 
-  Config config_eeprom_{}; ///< cached copy of non-volatile configuration
-  Config config_shadow_{}; ///< cached copy of volatile configuration
+  Config config_eeprom_{};  ///< cached copy of non-volatile configuration
+  Config config_shadow_{};  ///< cached copy of volatile configuration
 
-  uint8_t address_{0x00};  ///< store the address of the device on the bus
-  esphome::i2c::I2CBus *bus_{nullptr};   ///< pointer to I2CBus instance
+  uint8_t address_{0x00};               ///< store the address of the device on the bus
+  esphome::i2c::I2CBus *bus_{nullptr};  ///< pointer to I2CBus instance
 
-  GPIOPin* wake_pin_{nullptr};
-  GPIOPin* nfault_pin_{nullptr};
-  GPIOPin* watchdog_pin_{nullptr};
+  GPIOPin *wake_pin_{nullptr};
+  GPIOPin *nfault_pin_{nullptr};
+  GPIOPin *watchdog_pin_{nullptr};
   bool watchdog_over_i2c_{};
 
   bool awake_{false};

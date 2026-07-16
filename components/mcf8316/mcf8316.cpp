@@ -14,8 +14,10 @@ const char *const TAG = "MCF8316";
 
 #define RETURN_ERROR_IF_FAILED_OR_ASLEEP \
   { \
-    if (this->is_failed()) return ErrorCode::ERROR_FAILED; \
-    if (!this->awake_) return ErrorCode::ERROR_ASLEEP; \
+    if (this->is_failed()) \
+      return ErrorCode::ERROR_FAILED; \
+    if (!this->awake_) \
+      return ErrorCode::ERROR_ASLEEP; \
   }
 
 // 24-bit control word flags
@@ -39,25 +41,32 @@ struct CRC8 {
     this->value = crc;
   }
 
-  void append(const uint8_t* data, size_t length) {
+  void append(const uint8_t *data, size_t length) {
     while (length--) {
       this->append(*data++);
     }
   }
 };
 
-const char* ERROR_NAMES[] = {
-  "NO_ERROR", "ERROR_I2C", "ERROR_CRC", "ERROR_DEVICE", "ERROR_ASLEEP", "ERROR_FAILED",
+const char *ERROR_NAMES[] = {
+    "NO_ERROR",
+    "ERROR_I2C",
+    "ERROR_CRC",
+    "ERROR_DEVICE",
+    "ERROR_ASLEEP",
+    "ERROR_FAILED",
 };
 
-const char* MCF8316Component::error_name(ErrorCode code) {
+const char *MCF8316Component::error_name(ErrorCode code) {
   if (unsigned(code) < sizeof(ERROR_NAMES) / sizeof(ERROR_NAMES[0])) {
     return ERROR_NAMES[size_t(code)];
   }
   return "UNKNOWN";
 }
 
-float MCF8316Component::get_setup_priority() const { return setup_priority::HARDWARE; }
+float MCF8316Component::get_setup_priority() const {
+  return setup_priority::HARDWARE;
+}
 
 void MCF8316Component::dump_config() {
   ESP_LOGCONFIG(TAG, "MCF8316 component:");
@@ -73,22 +82,22 @@ void MCF8316Component::dump_config() {
 Config MCF8316Component::make_default_config() const {
   Config config{};
   config.set(I2C_TARGET_ADDR, this->address_);
-  config.set(SPEED_MODE, SpeedMode::DIGITAL_SPEED_CTRL); // set speed over I2C
-  config.set(INPUT_REFERENCE_MODE, InputReferenceMode::SPEED); // input reference is speed percentage
-  config.set(BRAKE_INPUT, BrakeInput::OVERRIDE_OFF); // set brake over I2C
-  config.set(DIR_INPUT, DirInput::OVERRIDE_CLOCKWISE); // set direction over I2C
-  config.set(DEV_MODE, DeviceMode::SLEEP); // enable sleep when wake pin is low
-  config.set(SLEEP_ENTRY_TIME, SleepEntryTime::SLEEP_AFTER_20_MS); // sleep when speed pin low for this amount of time
+  config.set(SPEED_MODE, SpeedMode::DIGITAL_SPEED_CTRL);            // set speed over I2C
+  config.set(INPUT_REFERENCE_MODE, InputReferenceMode::SPEED);      // input reference is speed percentage
+  config.set(BRAKE_INPUT, BrakeInput::OVERRIDE_OFF);                // set brake over I2C
+  config.set(DIR_INPUT, DirInput::OVERRIDE_CLOCKWISE);              // set direction over I2C
+  config.set(DEV_MODE, DeviceMode::SLEEP);                          // enable sleep when wake pin is low
+  config.set(SLEEP_ENTRY_TIME, SleepEntryTime::SLEEP_AFTER_20_MS);  // sleep when speed pin low for this amount of time
   if (this->watchdog_pin_) {
-    config.set(EXT_WDT_EN, true); // enable watchdog timer
-    config.set(EXT_WDT_CONFIG, WatchdogTimeout::TIMEOUT_I2C_10_S_GPIO_1000_MS); // 1 second timeout over GPIO
-    config.set(EXT_WDT_INPUT_MODE, WatchdogInputMode::GPIO); // watchdog tickle over GPIO
-    config.set(EXT_WDT_FAULT_MODE, WatchdogFaultMode::LATCH_HI_Z); // latch in Hi-Z when watchdog fault occurs
+    config.set(EXT_WDT_EN, true);                                                // enable watchdog timer
+    config.set(EXT_WDT_CONFIG, WatchdogTimeout::TIMEOUT_I2C_10_S_GPIO_1000_MS);  // 1 second timeout over GPIO
+    config.set(EXT_WDT_INPUT_MODE, WatchdogInputMode::GPIO);                     // watchdog tickle over GPIO
+    config.set(EXT_WDT_FAULT_MODE, WatchdogFaultMode::LATCH_HI_Z);  // latch in Hi-Z when watchdog fault occurs
   } else if (this->watchdog_over_i2c_) {
-    config.set(EXT_WDT_EN, true); // enable watchdog timer
-    config.set(EXT_WDT_CONFIG, WatchdogTimeout::TIMEOUT_I2C_1_S_GPIO_100_MS); // 1 second timeout over I2C
-    config.set(EXT_WDT_INPUT_MODE, WatchdogInputMode::I2C); // watchdog tickle over I2C
-    config.set(EXT_WDT_FAULT_MODE, WatchdogFaultMode::LATCH_HI_Z); // latch in Hi-Z when watchdog fault occurs
+    config.set(EXT_WDT_EN, true);                                              // enable watchdog timer
+    config.set(EXT_WDT_CONFIG, WatchdogTimeout::TIMEOUT_I2C_1_S_GPIO_100_MS);  // 1 second timeout over I2C
+    config.set(EXT_WDT_INPUT_MODE, WatchdogInputMode::I2C);                    // watchdog tickle over I2C
+    config.set(EXT_WDT_FAULT_MODE, WatchdogFaultMode::LATCH_HI_Z);  // latch in Hi-Z when watchdog fault occurs
   } else {
     config.set(EXT_WDT_EN, false);
   }
@@ -108,13 +117,13 @@ void MCF8316Component::setup() {
   // PIN_CONFIG register into the config shadow so that the wake/sleep functions can
   // check the SPEED_MODE parameter and do the right thing.
   this->wake_pin_->digital_write(false);
-  this->awake_ = true; // pretend the device is already awake
-  if (this->read_register_(Register::PIN_CONFIG,
-      &this->config_shadow_.at<Register::PIN_CONFIG>().value, true /*silence_logs*/)) {
+  this->awake_ = true;  // pretend the device is already awake
+  if (this->read_register_(
+          Register::PIN_CONFIG, &this->config_shadow_.at<Register::PIN_CONFIG>().value, true /*silence_logs*/)) {
     // The device did not respond.  Assume it's asleep.
     this->config_shadow_.set(SPEED_MODE, SpeedMode::DIGITAL_SPEED_CTRL);
   }
-  this->awake_ = false; // stop pretending
+  this->awake_ = false;  // stop pretending
 
   // Now wake up for real, if needed.
   this->wake_();
@@ -146,7 +155,7 @@ void MCF8316Component::wake_() {
     ESP_LOGI(TAG, "Waking from sleep");
     this->awake_ = true;
     this->update_wake_state_for_pin_config_();
-    delay(8); // time to wake is 3 to 5 ms according to the datasheet, allow a small margin
+    delay(8);  // time to wake is 3 to 5 ms according to the datasheet, allow a small margin
 
     ErrorCode error = this->read_config();
     if (error) {
@@ -174,7 +183,7 @@ void MCF8316Component::update_wake_state_for_pin_config_() {
 }
 
 void MCF8316Component::tickle_watchdog_() {
-  constexpr uint32_t TICKLE_INTERVAL = 250; // must be less than the configured watchdog timeout (1000 ms)
+  constexpr uint32_t TICKLE_INTERVAL = 250;  // must be less than the configured watchdog timeout (1000 ms)
   uint32_t now = millis();
   if (now - this->last_tickle_time_ < TICKLE_INTERVAL) {
     return;
@@ -217,9 +226,11 @@ void MCF8316Component::check_fault_() {
     this->fault_status_ = {};
   } else {
     FaultStatus fault_status{};
-    if (this->read_register_(Register::GATE_DRIVER_FAULT_STATUS, reinterpret_cast<uint32_t*>(&fault_status.gate_driver))
-        || this->read_register_(Register::CONTROLLER_FAULT_STATUS, reinterpret_cast<uint32_t*>(&fault_status.controller))
-        || fault_status == this->fault_status_) {
+    if (this->read_register_(
+            Register::GATE_DRIVER_FAULT_STATUS, reinterpret_cast<uint32_t *>(&fault_status.gate_driver)) ||
+        this->read_register_(
+            Register::CONTROLLER_FAULT_STATUS, reinterpret_cast<uint32_t *>(&fault_status.controller)) ||
+        fault_status == this->fault_status_) {
       return;
     }
     this->fault_status_ = fault_status;
@@ -231,12 +242,10 @@ void MCF8316Component::check_fault_() {
 
 void MCF8316Component::log_fault_() {
   if (this->fault_status_.gate_driver) {
-    ESP_LOGW(TAG, "Gate driver fault: %s",
-        format_gate_driver_fault_status(this->fault_status_.gate_driver).c_str());
+    ESP_LOGW(TAG, "Gate driver fault: %s", format_gate_driver_fault_status(this->fault_status_.gate_driver).c_str());
   }
   if (this->fault_status_.controller) {
-    ESP_LOGW(TAG, "Controller fault: %s",
-        format_controller_fault_status(this->fault_status_.controller).c_str());
+    ESP_LOGW(TAG, "Controller fault: %s", format_controller_fault_status(this->fault_status_.controller).c_str());
   }
 }
 
@@ -277,7 +286,7 @@ void MCF8316Component::check_algorithm_state_() {
     } else {
       this->algorithm_state_failure_count_ = 1;
     }
-    return; // skip it
+    return;  // skip it
   }
 
   if (this->algorithm_state_failure_count_) {
@@ -303,8 +312,8 @@ MCF8316Component::ErrorCode MCF8316Component::read_config() {
 
   ESP_LOGI(TAG, "Reading configuration shadow registers");
   for (size_t i = 0; i < Config::LENGTH; i++) {
-    ErrorCode error = this->read_register_(Config::index_to_register(i),
-        &this->config_shadow_.register_values[i].value);
+    ErrorCode error =
+        this->read_register_(Config::index_to_register(i), &this->config_shadow_.register_values[i].value);
     if (error) {
       ESP_LOGE(TAG, "Failed to read configuration shadow registers: %s", error_name(error));
       return error;
@@ -319,7 +328,8 @@ MCF8316Component::ErrorCode MCF8316Component::write_config(Config config) {
 
   ESP_LOGI(TAG, "Writing configuration shadow registers");
   for (size_t i = 0; i < Config::LENGTH; i++) {
-    ErrorCode error = this->modify_config_register_with_workarounds_(Config::index_to_register(i), config.register_values[i]);
+    ErrorCode error =
+        this->modify_config_register_with_workarounds_(Config::index_to_register(i), config.register_values[i]);
     if (error) {
       ESP_LOGE(TAG, "Failed to write configuration shadow registers: %s", error_name(error));
       return error;
@@ -344,7 +354,8 @@ MCF8316Component::ErrorCode MCF8316Component::load_config_from_eeprom() {
   delay(200);
   error = this->read(&algo_ctrl1);
   if (error || algo_ctrl1.value != 0) {
-    ESP_LOGW(TAG, "Failed to confirm the configuration shadow registers were loaded from the EEPROM: %s", error_name(error));
+    ESP_LOGW(
+        TAG, "Failed to confirm the configuration shadow registers were loaded from the EEPROM: %s", error_name(error));
     // Continue to try to read the configuration anyway
   }
 
@@ -381,7 +392,8 @@ MCF8316Component::ErrorCode MCF8316Component::save_config_to_eeprom() {
   delay(750);
   error = this->read(&algo_ctrl1);
   if (error || algo_ctrl1.value != 0) {
-    ESP_LOGE(TAG, "Failed to confirm the configuration shadow registers were saved to the EEPROM: %s", error_name(error));
+    ESP_LOGE(
+        TAG, "Failed to confirm the configuration shadow registers were saved to the EEPROM: %s", error_name(error));
     return error ? error : ErrorCode::ERROR_DEVICE;
   }
 
@@ -402,8 +414,8 @@ MCF8316Component::ErrorCode MCF8316Component::start_mpet(bool write_shadow) {
   algo_debug2.set(MPET_WRITE_SHADOW, write_shadow);
   ErrorCode error = this->write(algo_debug2);
   if (error) {
-      ESP_LOGE(TAG, "Failed to start MPET: %s", error);
-      return error;
+    ESP_LOGE(TAG, "Failed to start MPET: %s", error);
+    return error;
   }
   this->mpet_in_progress_ = true;
   this->mpet_may_write_shadow_ = write_shadow;
@@ -415,7 +427,7 @@ void MCF8316Component::check_mpet_algorithm_state_(AlgorithmState algorithm_stat
   constexpr uint32_t MPET_MINIMUM_RUNTIME_MS = 500;
   if (!this->mpet_in_progress_ || is_mpet_running(algorithm_state) ||
       millis() - this->mpet_start_time_ < MPET_MINIMUM_RUNTIME_MS) {
-    return; // wait for MPET to finish
+    return;  // wait for MPET to finish
   }
 
   this->mpet_in_progress_ = false;
@@ -441,7 +453,7 @@ void MCF8316Component::check_mpet_algorithm_state_(AlgorithmState algorithm_stat
     ESP_LOGI(TAG, "  SPEED_PI_LOOP_KI: %d", speed_pi.get(SPEED_PI_LOOP_KI));
     ESP_LOGI(TAG, "  SPEED_PI_LOOP_KP: %d", speed_pi.get(SPEED_PI_LOOP_KP));
   }
-#if false // irrelevant because we evaluated a speed mode control loop
+#if false  // irrelevant because we evaluated a speed mode control loop
   RegisterValue<Register::CURRENT_PI> current_pi;
   if (!read(&current_pi)) {
     ESP_LOGI(TAG, "  CURRENT_PI_LOOP_KI: %d", current_pi.get(CURRENT_PI_LOOP_KI));
@@ -458,7 +470,7 @@ void MCF8316Component::check_mpet_algorithm_state_(AlgorithmState algorithm_stat
       ESP_LOGI(TAG, "  MOTOR_BEMF_CONST: %d", this->config_shadow_.get(MOTOR_BEMF_CONST));
       ESP_LOGI(TAG, "  SPD_LOOP_KP: %d", this->config_shadow_.get(SPD_LOOP_KP));
       ESP_LOGI(TAG, "  SPD_LOOP_KI: %d", this->config_shadow_.get(SPD_LOOP_KI));
-#if false // irrelevant because we evaluated a speed mode control loop
+#if false  // irrelevant because we evaluated a speed mode control loop
       ESP_LOGI(TAG, "  CURR_LOOP_KP: %d", this->config_shadow_.get(CURR_LOOP_KP));
       ESP_LOGI(TAG, "  CURR_LOOP_KI: %d", this->config_shadow_.get(CURR_LOOP_KI));
 #endif
@@ -476,13 +488,13 @@ void MCF8316Component::check_mpet_algorithm_state_(AlgorithmState algorithm_stat
   this->write(algo_debug2);
 }
 
-MCF8316Component::ErrorCode MCF8316Component::read_speed_feedback(float* out_speed_in_rotor_hz) {
+MCF8316Component::ErrorCode MCF8316Component::read_speed_feedback(float *out_speed_in_rotor_hz) {
   RegisterValue<Register::SPEED_FDBK> speed_fdbk;
   ErrorCode error = read(&speed_fdbk);
   if (error) {
     return error;
   }
-  const float speed_feedback = static_cast<int32_t>(speed_fdbk.value); // value is signed
+  const float speed_feedback = static_cast<int32_t>(speed_fdbk.value);  // value is signed
   const float max_speed = this->config_shadow_.get(MAX_SPEED);
   const float speed_in_electrical_hz = speed_feedback * max_speed / (6 * (1 << 27));
   *out_speed_in_rotor_hz = this->convert_speed_in_electrical_hz_to_rotor_hz(speed_in_electrical_hz);
@@ -493,7 +505,8 @@ MCF8316Component::ErrorCode MCF8316Component::write_speed_input(float speed_in_r
   const float max_speed = this->config_shadow_.get(MAX_SPEED);
   const float speed_in_electrical_hz = this->convert_speed_in_rotor_hz_to_electrical_hz(speed_in_rotor_hz);
   RegisterValue<Register::ALGO_DEBUG1> algo_debug1;
-  algo_debug1.set(DIGITAL_SPEED_CTRL, unsigned(std::clamp(speed_in_electrical_hz * (32768.f * 6) / max_speed, 0.f, 32767.f)));
+  algo_debug1.set(
+      DIGITAL_SPEED_CTRL, unsigned(std::clamp(speed_in_electrical_hz * (32768.f * 6) / max_speed, 0.f, 32767.f)));
   return this->write(algo_debug1);
 }
 
@@ -514,12 +527,14 @@ MCF8316Component::ErrorCode MCF8316Component::write_brake_input_config(bool brak
 }
 
 MCF8316Component::ErrorCode MCF8316Component::write_direction_input_config(bool direction_counter_clockwise) {
-  return this->modify_config_register<Register::PERI_CONFIG1>([direction_counter_clockwise](RegisterValue<Register::PERI_CONFIG1> value) {
-    return value.set(DIR_INPUT, direction_counter_clockwise ? DirInput::OVERRIDE_COUNTER_CLOCKWISE : DirInput::OVERRIDE_CLOCKWISE);
-  });
+  return this->modify_config_register<Register::PERI_CONFIG1>(
+      [direction_counter_clockwise](RegisterValue<Register::PERI_CONFIG1> value) {
+        return value.set(DIR_INPUT,
+            direction_counter_clockwise ? DirInput::OVERRIDE_COUNTER_CLOCKWISE : DirInput::OVERRIDE_CLOCKWISE);
+      });
 }
 
-MCF8316Component::ErrorCode MCF8316Component::read_bus_current(float* out_current_in_amps) {
+MCF8316Component::ErrorCode MCF8316Component::read_bus_current(float *out_current_in_amps) {
   RegisterValue<Register::BUS_CURRENT> bus_current;
   ErrorCode error = read(&bus_current);
   if (error) {
@@ -529,7 +544,7 @@ MCF8316Component::ErrorCode MCF8316Component::read_bus_current(float* out_curren
   return ErrorCode::NO_ERROR;
 }
 
-MCF8316Component::ErrorCode MCF8316Component::read_motor_phase_peak_current(float* out_current_in_amps) {
+MCF8316Component::ErrorCode MCF8316Component::read_motor_phase_peak_current(float *out_current_in_amps) {
   RegisterValue<Register::IMAG_SQR> imag_sqr;
   ErrorCode error = read(&imag_sqr);
   if (error) {
@@ -539,7 +554,7 @@ MCF8316Component::ErrorCode MCF8316Component::read_motor_phase_peak_current(floa
   return ErrorCode::NO_ERROR;
 }
 
-MCF8316Component::ErrorCode MCF8316Component::read_vm_voltage(float* out_voltage_in_volts) {
+MCF8316Component::ErrorCode MCF8316Component::read_vm_voltage(float *out_voltage_in_volts) {
   RegisterValue<Register::VM_VOLTAGE> vm_voltage;
   ErrorCode error = read(&vm_voltage);
   if (error) {
@@ -551,7 +566,7 @@ MCF8316Component::ErrorCode MCF8316Component::read_vm_voltage(float* out_voltage
 
 MCF8316Component::ErrorCode MCF8316Component::modify_config_register_with_workarounds_(
     Register reg, RegisterValue_ register_value) {
-  RegisterValue_& shadow_value = this->config_shadow_.register_values[Config::register_to_index(reg)];
+  RegisterValue_ &shadow_value = this->config_shadow_.register_values[Config::register_to_index(reg)];
   if (register_value.equals_ignoring_config_register_parity(shadow_value)) {
     // Store the updated parity bit so that the config shadow reflects what the caller last wrote
     // even though the device ignores the bit.
@@ -561,8 +576,8 @@ MCF8316Component::ErrorCode MCF8316Component::modify_config_register_with_workar
   MCF8316Component::ErrorCode error;
   if (reg == Register::DEVICE_CONFIG2) {
     // The watchdog timer must be disabled before it is reconfigured, according to the datasheet
-    auto shadow_value_typed = static_cast<const RegisterValue<Register::DEVICE_CONFIG2>&>(shadow_value);
-    auto register_value_typed = static_cast<const RegisterValue<Register::DEVICE_CONFIG2>&>(register_value);
+    auto shadow_value_typed = static_cast<const RegisterValue<Register::DEVICE_CONFIG2> &>(shadow_value);
+    auto register_value_typed = static_cast<const RegisterValue<Register::DEVICE_CONFIG2> &>(register_value);
     if (register_value_typed.get(EXT_WDT_EN) && shadow_value_typed.get(EXT_WDT_EN) &&
         (register_value_typed.get(EXT_WDT_CONFIG) != shadow_value_typed.get(EXT_WDT_CONFIG) ||
             register_value_typed.get(EXT_WDT_INPUT_MODE) != shadow_value_typed.get(EXT_WDT_INPUT_MODE) ||
@@ -586,16 +601,18 @@ MCF8316Component::ErrorCode MCF8316Component::modify_config_register_with_workar
   return ErrorCode::NO_ERROR;
 }
 
-MCF8316Component::ErrorCode MCF8316Component::read_register_(Register reg, uint32_t* out_value, bool silence_logs) {
+MCF8316Component::ErrorCode MCF8316Component::read_register_(Register reg, uint32_t *out_value, bool silence_logs) {
   RETURN_ERROR_IF_FAILED_OR_ASLEEP;
 
   const uint32_t ctrl = CTRL_OP_READ | CTRL_CRC_EN | CTRL_DLEN_32 | uint32_t(reg);
   uint8_t write_buffer[] = {
-    uint8_t(ctrl >> 16), uint8_t(ctrl >> 8), uint8_t(ctrl),
+      uint8_t(ctrl >> 16),
+      uint8_t(ctrl >> 8),
+      uint8_t(ctrl),
   };
   uint8_t read_buffer[5];
-  esphome::i2c::ErrorCode i2c_error = this->bus_->write_readv(this->address_,
-      write_buffer, sizeof(write_buffer), read_buffer, sizeof(read_buffer));
+  esphome::i2c::ErrorCode i2c_error =
+      this->bus_->write_readv(this->address_, write_buffer, sizeof(write_buffer), read_buffer, sizeof(read_buffer));
   if (i2c_error) {
     if (!silence_logs) {
       ESP_LOGE(TAG, "Failed to read register 0x%x: ERROR_I2C code %d", reg, i2c_error);
@@ -631,17 +648,22 @@ MCF8316Component::ErrorCode MCF8316Component::write_register_(Register reg, cons
 
   const uint32_t ctrl = CTRL_CRC_EN | CTRL_DLEN_32 | uint32_t(reg);
   uint8_t write_buffer[] = {
-    uint8_t(ctrl >> 16), uint8_t(ctrl >> 8), uint8_t(ctrl),
-    uint8_t(value), uint8_t(value >> 8), uint8_t(value >> 16), uint8_t(value >> 24),
-    0 /*crc*/,
+      uint8_t(ctrl >> 16),
+      uint8_t(ctrl >> 8),
+      uint8_t(ctrl),
+      uint8_t(value),
+      uint8_t(value >> 8),
+      uint8_t(value >> 16),
+      uint8_t(value >> 24),
+      0 /*crc*/,
   };
   CRC8 crc;
   crc.append(this->address_ << 1);
   crc.append(write_buffer, sizeof(write_buffer) - 1);
   write_buffer[sizeof(write_buffer) - 1] = crc.value;
 
-  esphome::i2c::ErrorCode i2c_error = this->bus_->write_readv(this->address_,
-      write_buffer, sizeof(write_buffer), nullptr, 0);
+  esphome::i2c::ErrorCode i2c_error =
+      this->bus_->write_readv(this->address_, write_buffer, sizeof(write_buffer), nullptr, 0);
   if (i2c_error) {
     if (!silence_logs) {
       ESP_LOGE(TAG, "Failed to write register 0x%x: ERROR_I2C code %d", reg, i2c_error);

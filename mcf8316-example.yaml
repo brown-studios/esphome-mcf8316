@@ -43,7 +43,7 @@ external_components:
 i2c:
   - scl: 9
     sda: 8
-    scan: false # The MCF8316 will not be detected in a scan although it is harmless
+    scan: false  # The MCF8316 will not be detected in a scan although it is harmless
     frequency: 100kHz
 
 # Configure the BLDC motor driver.

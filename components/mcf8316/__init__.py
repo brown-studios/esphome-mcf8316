@@ -45,7 +45,9 @@ CONFIG_SCHEMA = cv.All(
             ),
             cv.Optional(CONF_ON_ALGORITHM_STATE): automation.validate_automation(
                 {
-                    cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(AlgorithmStateTrigger),
+                    cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(
+                        AlgorithmStateTrigger
+                    ),
                 }
             ),
         }
@@ -60,7 +62,11 @@ async def to_code(config):
     cg.add(var.set_wake_pin(await cg.gpio_pin_expression(config[CONF_WAKE_PIN])))
     cg.add(var.set_nfault_pin(await cg.gpio_pin_expression(config[CONF_NFAULT_PIN])))
     if CONF_WATCHDOG_PIN in config:
-        cg.add(var.set_watchdog_pin(await cg.gpio_pin_expression(config[CONF_WATCHDOG_PIN])))
+        cg.add(
+            var.set_watchdog_pin(
+                await cg.gpio_pin_expression(config[CONF_WATCHDOG_PIN])
+            )
+        )
     if CONF_WATCHDOG_OVER_I2C in config:
         cg.add(var.set_watchdog_over_i2c(config[CONF_WATCHDOG_OVER_I2C]))
     for conf in config.get(CONF_ON_FAULT, []):

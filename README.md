@@ -29,6 +29,16 @@ mcf8316:
 * on_fault: (OPTIONAL) An action that is triggered whenever the fault status changes. For example, this action can be used to observe when the motor driver encounters a fault so that a recovery action can be performed.
 * on_algorithm_state: (OPTIONAL) An action that is triggered whenever the motor driver's algorithm state changes. For example, this action can be used to observe when the motor driver returns to the idle state after stopping the motor.
 
+## Development
+
+This project follows the ESPHome code style with [pre-commit](https://pre-commit.com/) hooks for linting and code formatting.
+
+To run the style checks manually on all files and fix issues, run the following command:
+
+```
+uv run pre-commit run --all-files
+```
+
 ## Resources
 
 - [MCF8316D datasheet](https://www.ti.com/lit/ds/symlink/mcf8316d.pdf)
