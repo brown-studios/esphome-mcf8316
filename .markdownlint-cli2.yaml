@@ -1,0 +1,4 @@
+config:
+  line-length: false
+  ul-style:
+    style: dash
