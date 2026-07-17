@@ -19,7 +19,7 @@ mcf8316:
                 # Handle FaultStatus in 'x' variable
         on_algorithm_state:
             then:
-                # Handle AlgorithmState in 'x' variable
+                # Handle std::optional<AlgorithmState> in 'x' variable
 ```
 
 - wake: (REQUIRED) The pin connected to the WAKE/SPEED input.

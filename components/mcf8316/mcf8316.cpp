@@ -141,13 +141,11 @@ void MCF8316Component::setup() {
 }
 
 void MCF8316Component::loop() {
-  if (this->awake_) {
-    if (this->watchdog_pin_ || this->watchdog_over_i2c_) {
-      this->tickle_watchdog_();
-    }
-    this->check_fault_();
-    this->check_algorithm_state_();
+  if (this->awake_ && (this->watchdog_pin_ || this->watchdog_over_i2c_)) {
+    this->tickle_watchdog_();
   }
+  this->check_fault_();
+  this->check_algorithm_state_();
 }
 
 void MCF8316Component::wake_() {
@@ -169,8 +167,6 @@ void MCF8316Component::sleep_() {
     ESP_LOGI(TAG, "Going to sleep");
     this->awake_ = false;
     this->update_wake_state_for_pin_config_();
-    this->fault_status_ = {};
-    this->algorithm_state_ = {};
   }
 }
 
@@ -219,7 +215,7 @@ void MCF8316Component::tickle_watchdog_() {
 }
 
 void MCF8316Component::check_fault_() {
-  if (this->nfault_pin_->digital_read()) {
+  if (!this->awake_ || this->nfault_pin_->digital_read()) {
     if (!this->fault_status_.is_faulted()) {
       return;
     }
@@ -272,29 +268,31 @@ void MCF8316Component::update_warning_() {
 }
 
 void MCF8316Component::check_algorithm_state_() {
-  RegisterValue<Register::ALGORITHM_STATE> algorithm_state_value;
-  ErrorCode error = read(&algorithm_state_value);
-  if (error) {
-    if (!this->algorithm_state_failure_count_) {
-      ESP_LOGW(TAG, "Failed to read algorithm state: %s", error_name(error));
-      this->update_warning_();
-    }
-    constexpr uint8_t FAIL_LIMIT = 4;
-    if (this->algorithm_state_failure_count_ >= FAIL_LIMIT) {
-      this->algorithm_state_ = {};
-      this->mark_failed(LOG_STR("Device not responding"));
+  AlgorithmState algorithm_state{};
+  if (this->awake_) {
+    RegisterValue<Register::ALGORITHM_STATE> algorithm_state_value;
+    ErrorCode error = read(&algorithm_state_value);
+    if (error) {
+      if (!this->algorithm_state_failure_count_) {
+        ESP_LOGW(TAG, "Failed to read algorithm state: %s", error_name(error));
+        this->update_warning_();
+      }
+      constexpr uint8_t FAIL_LIMIT = 4;
+      if (this->algorithm_state_failure_count_ >= FAIL_LIMIT) {
+        this->mark_failed(LOG_STR("Device not responding"));
+      } else {
+        this->algorithm_state_failure_count_++;
+        return;  // wait a few more times before giving up
+      }
     } else {
-      this->algorithm_state_failure_count_ = 1;
+      if (this->algorithm_state_failure_count_) {
+        this->algorithm_state_failure_count_ = 0;
+        this->update_warning_();
+      }
+      algorithm_state = algorithm_state_value.get(ALGORITHM_STATE);
     }
-    return;  // skip it
   }
 
-  if (this->algorithm_state_failure_count_) {
-    this->algorithm_state_failure_count_ = 0;
-    this->update_warning_();
-  }
-
-  AlgorithmState algorithm_state = algorithm_state_value.get(ALGORITHM_STATE);
   bool trigger = false;
   if (this->algorithm_state_ != algorithm_state) {
     this->algorithm_state_ = algorithm_state;

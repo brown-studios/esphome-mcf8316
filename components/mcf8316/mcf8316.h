@@ -8,7 +8,6 @@
 
 #include <array>
 #include <cstdint>
-#include <optional>
 
 namespace esphome {
 namespace mcf8316 {
@@ -77,8 +76,8 @@ class MCF8316Component : public Component {
   void dump_config() override;
 
   // Gets the value of the algorithm state register most recently read in the loop.
-  // Returns an empty value if the driver is asleep or the register could not be read.
-  std::optional<AlgorithmState> algorithm_state() const {
+  // Returns AlgorithmState::MOTOR_IDLE if the driver is asleep or the register could not be read.
+  AlgorithmState algorithm_state() const {
     return this->algorithm_state_;
   }
 
@@ -252,7 +251,7 @@ class MCF8316Component : public Component {
   uint8_t tickle_failure_count_{};
   uint32_t last_tickle_time_{};
 
-  std::optional<AlgorithmState> algorithm_state_{};
+  AlgorithmState algorithm_state_{};
   uint8_t algorithm_state_failure_count_{};
   CallbackManager<void(AlgorithmState)> on_algorithm_state_callback_;
 
