@@ -6,3 +6,5 @@
 private
 private-*
 .vscode
+.venv
+.ruff_cache

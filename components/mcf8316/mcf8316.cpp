@@ -412,7 +412,7 @@ MCF8316Component::ErrorCode MCF8316Component::start_mpet(bool write_shadow) {
   algo_debug2.set(MPET_WRITE_SHADOW, write_shadow);
   ErrorCode error = this->write(algo_debug2);
   if (error) {
-    ESP_LOGE(TAG, "Failed to start MPET: %s", error);
+    ESP_LOGE(TAG, "Failed to start MPET: error %d", error);
     return error;
   }
   this->mpet_in_progress_ = true;
@@ -613,7 +613,7 @@ MCF8316Component::ErrorCode MCF8316Component::read_register_(Register reg, uint3
       this->bus_->write_readv(this->address_, write_buffer, sizeof(write_buffer), read_buffer, sizeof(read_buffer));
   if (i2c_error) {
     if (!silence_logs) {
-      ESP_LOGE(TAG, "Failed to read register 0x%x: ERROR_I2C code %d", reg, i2c_error);
+      ESP_LOGE(TAG, "Failed to read register 0x%x: ERROR_I2C code %d", unsigned(reg), i2c_error);
     }
     return ErrorCode::ERROR_I2C;
   }
@@ -625,14 +625,14 @@ MCF8316Component::ErrorCode MCF8316Component::read_register_(Register reg, uint3
   const uint8_t crc_actual = read_buffer[sizeof(read_buffer) - 1];
   if (crc_expected.value != crc_actual) {
     if (!silence_logs) {
-      ESP_LOGE(TAG, "Failed to read register 0x%x: ERROR_CRC", reg);
+      ESP_LOGE(TAG, "Failed to read register 0x%x: ERROR_CRC", unsigned(reg));
     }
     return ErrorCode::ERROR_CRC;
   }
 
   *out_value = read_buffer[0] | (read_buffer[1] << 8) | (read_buffer[2] << 16) | (read_buffer[3] << 24);
   if (!silence_logs) {
-    ESP_LOGVV(TAG, "Read register: 0x%x, value: 0x%08x", reg, *out_value);
+    ESP_LOGVV(TAG, "Read register: 0x%x, value: 0x%08lx", reg, *out_value);
   }
   return ErrorCode::NO_ERROR;
 }
@@ -641,7 +641,7 @@ MCF8316Component::ErrorCode MCF8316Component::write_register_(Register reg, cons
   RETURN_ERROR_IF_FAILED_OR_ASLEEP;
 
   if (!silence_logs) {
-    ESP_LOGVV(TAG, "Write register: 0x%x, value: 0x%08x", reg, value);
+    ESP_LOGVV(TAG, "Write register: 0x%x, value: 0x%08lx", reg, value);
   }
 
   const uint32_t ctrl = CTRL_CRC_EN | CTRL_DLEN_32 | uint32_t(reg);
@@ -664,7 +664,7 @@ MCF8316Component::ErrorCode MCF8316Component::write_register_(Register reg, cons
       this->bus_->write_readv(this->address_, write_buffer, sizeof(write_buffer), nullptr, 0);
   if (i2c_error) {
     if (!silence_logs) {
-      ESP_LOGE(TAG, "Failed to write register 0x%x: ERROR_I2C code %d", reg, i2c_error);
+      ESP_LOGE(TAG, "Failed to write register 0x%x: ERROR_I2C code %d", unsigned(reg), i2c_error);
     }
     return ErrorCode::ERROR_I2C;
   }

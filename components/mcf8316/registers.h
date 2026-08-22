@@ -1360,7 +1360,7 @@ constexpr unsigned fg_div_to_motor_poles(unsigned fg_div) {
   return fg_div << 1;
 }
 constexpr unsigned fg_div_from_motor_poles(unsigned motor_poles) {
-  if (motor_poles >= 0 && motor_poles <= 30u && (motor_poles & 1u) == 0u) {
+  if (motor_poles <= 30u && (motor_poles & 1u) == 0u) {
     return motor_poles >> 1;
   }
   return 0;  // invalid
