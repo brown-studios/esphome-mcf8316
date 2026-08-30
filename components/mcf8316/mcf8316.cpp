@@ -221,12 +221,14 @@ void MCF8316Component::check_fault_() {
     }
     this->fault_status_ = {};
   } else {
-    FaultStatus fault_status{};
-    if (this->read_register_(
-            Register::GATE_DRIVER_FAULT_STATUS, reinterpret_cast<uint32_t *>(&fault_status.gate_driver)) ||
-        this->read_register_(
-            Register::CONTROLLER_FAULT_STATUS, reinterpret_cast<uint32_t *>(&fault_status.controller)) ||
-        fault_status == this->fault_status_) {
+    uint32_t gate_driver_fault;
+    uint32_t controller_fault;
+    if (this->read_register_(Register::GATE_DRIVER_FAULT_STATUS, &gate_driver_fault) ||
+        this->read_register_(Register::CONTROLLER_FAULT_STATUS, &controller_fault)) {
+      return;
+    }
+    FaultStatus fault_status{GateDriverFaultStatus(gate_driver_fault), ControllerFaultStatus(controller_fault)};
+    if (fault_status == this->fault_status_) {
       return;
     }
     this->fault_status_ = fault_status;
