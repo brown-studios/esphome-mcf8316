@@ -69,7 +69,7 @@ float MCF8316Component::get_setup_priority() const {
 }
 
 void MCF8316Component::dump_config() {
-  ESP_LOGCONFIG(TAG, "MCF8316 component:");
+  ESP_LOGCONFIG(TAG, "MCF8316:");
   ESP_LOGCONFIG(TAG, "  Address: 0x%02X", this->address_);
   LOG_PIN("  WAKE Pin: ", this->wake_pin_);
   LOG_PIN("  NFAULT Pin: ", this->nfault_pin_);
@@ -127,7 +127,6 @@ void MCF8316Component::setup() {
 
   // Now wake up for real, if needed.
   this->wake_();
-  this->clear_fault();
 
   // This is important so retry just in case.
   ErrorCode error = this->load_config_from_eeprom();
@@ -154,6 +153,9 @@ void MCF8316Component::wake_() {
     this->awake_ = true;
     this->update_wake_state_for_pin_config_();
     delay(8);  // time to wake is 3 to 5 ms according to the datasheet, allow a small margin
+
+    this->tickle_watchdog_();
+    this->clear_fault();
 
     ErrorCode error = this->read_config();
     if (error) {
@@ -187,7 +189,7 @@ void MCF8316Component::tickle_watchdog_() {
 
   if (this->watchdog_pin_) {
     this->watchdog_pin_->digital_write(true);
-    esphome::delay_microseconds_safe(100);
+    esphome::delay_microseconds_safe(1);
     this->watchdog_pin_->digital_write(false);
   } else if (this->watchdog_over_i2c_) {
     RegisterValue<Register::ALGO_CTRL1> algo_ctrl1;
@@ -227,7 +229,7 @@ void MCF8316Component::check_fault_() {
         this->read_register_(Register::CONTROLLER_FAULT_STATUS, &controller_fault)) {
       return;
     }
-    FaultStatus fault_status{GateDriverFaultStatus(gate_driver_fault), ControllerFaultStatus(controller_fault)};
+    FaultStatus fault_status{.gate_driver = gate_driver_fault, .controller = controller_fault};
     if (fault_status == this->fault_status_) {
       return;
     }
