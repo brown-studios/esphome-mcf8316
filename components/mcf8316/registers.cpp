@@ -1,4 +1,3 @@
-#include "esphome/core/log.h"
 #include "esphome/core/helpers.h"
 #include "registers.h"
 
@@ -6,27 +5,6 @@
 
 namespace esphome {
 namespace mcf8316 {
-
-const char *const TAG = "MCF8316";
-
-// Logs the contents of the configuration
-void log_config_field_value(const char *name, uint32_t value) {
-  ESP_LOGCONFIG(TAG, "      - %s: 0x%lx", name, value);
-}
-
-#define MCF8316_LOG_CONFIG_FIELD(field) log_config_field_value(#field, uint32_t(config.get(field)));
-
-void log_config_register_value(const char *name, uint32_t value) {
-  ESP_LOGCONFIG(TAG, "    %s: 0x%08lx", name, value);
-}
-#define MCF8316_LOG_CONFIG_REGISTER(reg) \
-  log_config_register_value(#reg, config.at<Register::reg>().value); \
-  MCF8316_FOR_EACH_FIELD_OF_REGISTER(reg, MCF8316_LOG_CONFIG_FIELD);
-
-void log_config(const Config &config) {
-  ESP_LOGCONFIG(TAG, "  Configuration registers:");
-  MCF8316_FOR_EACH_CONFIG_REGISTER(MCF8316_LOG_CONFIG_REGISTER)
-}
 
 bool Config::needs_mpet_for_speed_loop() const {
   return get(MOTOR_RES) == 0 || get(MOTOR_IND) == 0 || get(MOTOR_BEMF_CONST) == 0 || get(SPD_LOOP_KP) == 0 ||

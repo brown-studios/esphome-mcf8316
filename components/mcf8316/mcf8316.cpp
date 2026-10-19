@@ -10,7 +10,7 @@
 namespace esphome {
 namespace mcf8316 {
 
-const char *const TAG = "MCF8316";
+ESPHOME_LOG_TAG(TAG, "MCF8316");
 
 #define RETURN_ERROR_IF_FAILED_OR_ASLEEP \
   { \
@@ -75,8 +75,6 @@ void MCF8316Component::dump_config() {
   LOG_PIN("  NFAULT Pin: ", this->nfault_pin_);
   LOG_PIN("  Watchdog Pin: ", this->watchdog_pin_);
   ESP_LOGCONFIG(TAG, "  Watchdog Source: %s", this->watchdog_over_i2c_ ? "I2C" : this->watchdog_pin_ ? "Pin" : "None");
-
-  log_config(this->config_shadow_);
 }
 
 Config MCF8316Component::make_default_config() const {
